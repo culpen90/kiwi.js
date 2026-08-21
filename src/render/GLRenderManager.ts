@@ -95,6 +95,14 @@ module Kiwi.Renderers {
 		private _currentRenderer: Renderer = null;
 
 		/**
+		* The last renderer that was enabled, retained across frame resets.
+		* @property _lastRenderer
+		* @type Kiwi.Renderers.Renderer
+		* @private
+		*/
+		private _lastRenderer: Renderer = null;
+
+		/**
 		* The current blend mode.
 		* @property _currentBlendMode
 		* @type Kiwi.Renderers.GLBlendMode
@@ -684,9 +692,20 @@ module Kiwi.Renderers {
 		* @private
 		*/
 		private _switchRenderer(gl: WebGLRenderingContext, entity: Entity) {
+			var nextRenderer = entity.glRenderer;
+
+			// Renderer implementations may update uniforms directly.
+			// Drop the previous program cache before enabling a new renderer.
+			if (this._lastRenderer &&
+				this._lastRenderer !== nextRenderer &&
+				this._lastRenderer.shaderPair) {
+				this._lastRenderer.shaderPair.invalidateUniforms();
+			}
+
 			if (this._currentRenderer) this._currentRenderer.disable(gl);
-			this._currentRenderer = entity.glRenderer;
+			this._currentRenderer = nextRenderer;
 			this._currentRenderer.enable(gl, { camMatrix: this.camMatrix, stageResolution: this._stageResolution });
+			this._lastRenderer = this._currentRenderer;
 		}
 
 		/**

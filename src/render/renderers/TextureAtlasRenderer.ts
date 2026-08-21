@@ -127,13 +127,9 @@ module Kiwi.Renderers {
 
 			//this.shaderPair = <Kiwi.Shaders.TextureAtlasShader>this.shaderManager.requestShader(gl, "TextureAtlasShader", true);
 			this.shaderPair = this.shaderManager.requestShader(gl, this._shaderPairName, true);
-			
-			//Texture
-			gl.uniform1i(this.shaderPair.uniforms.uSampler.location, 0);
-
-			//Other uniforms
-			gl.uniform2fv(this.shaderPair.uniforms.uResolution.location, params.stageResolution);
-			gl.uniformMatrix3fv(this.shaderPair.uniforms.uCamMatrix.location, false, params.camMatrix);
+			this.shaderPair.setParam("uSampler", 0);
+			this.shaderPair.setParam("uResolution", params.stageResolution);
+			this.shaderPair.setParam("uCamMatrix", params.camMatrix);
 		}
 
 		/**
@@ -155,7 +151,7 @@ module Kiwi.Renderers {
 		*/
 		public clear(gl: WebGLRenderingContext, params: any) {
 			this._vertexBuffer.clear();
-			gl.uniformMatrix3fv(this.shaderPair.uniforms.uCamMatrix.location, false, params.camMatrix);
+			this.shaderPair.setParam("uCamMatrix", params.camMatrix);
 		}
 
 		/**
@@ -165,6 +161,7 @@ module Kiwi.Renderers {
 		* @public
 		*/
 		public draw(gl: WebGLRenderingContext) {
+			this.shaderPair.applyUniforms(gl);
 			this._vertexBuffer.uploadBuffer(gl, this._vertexBuffer.items);
 
 			gl.enableVertexAttribArray(this.shaderPair.attributes.aXYUV);
@@ -200,7 +197,7 @@ module Kiwi.Renderers {
 		* @public
 		*/
 		public updateStageResolution(gl: WebGLRenderingContext, res: Float32Array) {
-			gl.uniform2fv(this.shaderPair.uniforms.uResolution.location, res);
+			this.shaderPair.setParam("uResolution", res);
 		}
 
 		/**
@@ -211,7 +208,7 @@ module Kiwi.Renderers {
 		* @public
 		*/
 		public updateTextureSize(gl: WebGLRenderingContext, size: Float32Array) {
-			gl.uniform2fv(this.shaderPair.uniforms.uTextureSize.location, size);
+			this.shaderPair.setParam("uTextureSize", size);
 		}
 
 		/**

@@ -10587,6 +10587,13 @@ declare module Kiwi.Renderers {
         */
         private _currentRenderer;
         /**
+        * The last renderer that was enabled, retained across frame resets.
+        * @property _lastRenderer
+        * @type Kiwi.Renderers.Renderer
+        * @private
+        */
+        private _lastRenderer;
+        /**
         * The current blend mode.
         * @property _currentBlendMode
         * @type Kiwi.Renderers.GLBlendMode
@@ -11963,13 +11970,36 @@ declare module Kiwi.Shaders {
         */
         vertSource: Array<any>;
         /**
-        * Sets a single uniform value and marks it as dirty.
+        * Sets a single uniform value, marking it as dirty when it has changed.
         * @method setParam
         * @param uniformName {string}
         * @param value {*}
         * @public
         */
         setParam(uniformName: string, value: any): void;
+        /**
+        * Compares uniform values, including array-like values.
+        * @method _uniformValueEquals
+        * @param valueA {*}
+        * @param valueB {*}
+        * @return {boolean}
+        * @private
+        */
+        private _uniformValueEquals(valueA, valueB);
+        /**
+        * Copies array-like uniform values so later in-place changes are detected.
+        * @method _copyUniformValue
+        * @param value {*}
+        * @return {*}
+        * @private
+        */
+        private _copyUniformValue(value);
+        /**
+        * Invalidates cached uniform state so the next assigned value is uploaded.
+        * @method invalidateUniforms
+        * @public
+        */
+        invalidateUniforms(): void;
         /**
         * Applies all uniforms to the uploaded program
         * @method applyUniforms
