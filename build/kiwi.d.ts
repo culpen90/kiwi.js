@@ -11942,9 +11942,9 @@ declare module Kiwi.Shaders {
         */
         uniforms: any;
         /**
-        * Attribute descriptors
+        * Attribute locations, keyed by name.
         * @property attributes
-        * @type Array
+        * @type Object
         * @public
         */
         attributes: any;
@@ -11985,6 +11985,13 @@ declare module Kiwi.Shaders {
         * @public
         */
         applyUniform(gl: WebGLRenderingContext, name: string): void;
+        /**
+        * Detects the attributes exposed by the linked shader program.
+        * @method initAttributes
+        * @param gl {WebGLRenderingContext}
+        * @public
+        */
+        initAttributes(gl: WebGLRenderingContext): void;
         /**
         * Initialises all uniforms
         * @method initUniforms

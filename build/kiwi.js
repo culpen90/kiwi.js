@@ -17369,6 +17369,7 @@ var Kiwi;
                 this.vertShader = this.compile(gl, this.vertSource.join("\n"), gl.VERTEX_SHADER);
                 this.fragShader = this.compile(gl, this.fragSource.join("\n"), gl.FRAGMENT_SHADER);
                 this.shaderProgram = this.attach(gl, this.vertShader, this.fragShader);
+                this.initAttributes(gl);
                 this.loaded = true;
             };
             /**
@@ -17439,6 +17440,27 @@ var Kiwi;
                 if (this.uniforms[name].dirty) {
                     gl["uniform" + u.type](u.location, u.value);
                     this.uniforms[name].dirty = false;
+                }
+            };
+            /**
+            * Detects the attributes exposed by the linked shader program.
+            * @method initAttributes
+            * @param gl {WebGLRenderingContext}
+            * @public
+            */
+            ShaderPair.prototype.initAttributes = function (gl) {
+                if (!this.attributes) {
+                    this.attributes = {};
+                }
+                for (var attributeName in this.attributes) {
+                    this.attributes[attributeName] = gl.getAttribLocation(this.shaderProgram, attributeName);
+                }
+                var attributeCount = gl.getProgramParameter(this.shaderProgram, gl.ACTIVE_ATTRIBUTES);
+                for (var i = 0; i < attributeCount; i++) {
+                    var attribute = gl.getActiveAttrib(this.shaderProgram, i);
+                    if (attribute && !Object.prototype.hasOwnProperty.call(this.attributes, attribute.name)) {
+                        this.attributes[attribute.name] = gl.getAttribLocation(this.shaderProgram, attribute.name);
+                    }
                 }
             };
             /**
@@ -17567,8 +17589,6 @@ var Kiwi;
             */
             TextureAtlasShader.prototype.init = function (gl) {
                 _super.prototype.init.call(this, gl);
-                this.attributes.aXYUV = gl.getAttribLocation(this.shaderProgram, "aXYUV");
-                this.attributes.aAlpha = gl.getAttribLocation(this.shaderProgram, "aAlpha");
                 this.initUniforms(gl);
             };
             return TextureAtlasShader;
