@@ -15381,6 +15381,13 @@ var Kiwi;
                 */
                 this._currentRenderer = null;
                 /**
+                * The last renderer that was enabled, retained across frame resets.
+                * @property _lastRenderer
+                * @type Kiwi.Renderers.Renderer
+                * @private
+                */
+                this._lastRenderer = null;
+                /**
                 * Tally of number of entities rendered per frame
                 * @property _entityCount
                 * @type number
@@ -15910,10 +15917,17 @@ var Kiwi;
             * @private
             */
             GLRenderManager.prototype._switchRenderer = function (gl, entity) {
+                var nextRenderer = entity.glRenderer;
+                // Renderer implementations may update uniforms directly.
+                // Drop the previous program cache before enabling a new renderer.
+                if (this._lastRenderer && this._lastRenderer !== nextRenderer && this._lastRenderer.shaderPair) {
+                    this._lastRenderer.shaderPair.invalidateUniforms();
+                }
                 if (this._currentRenderer)
                     this._currentRenderer.disable(gl);
-                this._currentRenderer = entity.glRenderer;
+                this._currentRenderer = nextRenderer;
                 this._currentRenderer.enable(gl, { camMatrix: this.camMatrix, stageResolution: this._stageResolution });
+                this._lastRenderer = this._currentRenderer;
             };
             /**
             * Switch texture to the one needed by the entity that needs rendering
@@ -17198,11 +17212,9 @@ var Kiwi;
                 if (params === void 0) { params = null; }
                 //this.shaderPair = <Kiwi.Shaders.TextureAtlasShader>this.shaderManager.requestShader(gl, "TextureAtlasShader", true);
                 this.shaderPair = this.shaderManager.requestShader(gl, this._shaderPairName, true);
-                //Texture
-                gl.uniform1i(this.shaderPair.uniforms.uSampler.location, 0);
-                //Other uniforms
-                gl.uniform2fv(this.shaderPair.uniforms.uResolution.location, params.stageResolution);
-                gl.uniformMatrix3fv(this.shaderPair.uniforms.uCamMatrix.location, false, params.camMatrix);
+                this.shaderPair.setParam("uSampler", 0);
+                this.shaderPair.setParam("uResolution", params.stageResolution);
+                this.shaderPair.setParam("uCamMatrix", params.camMatrix);
             };
             /**
             * Disables the renderer
@@ -17222,7 +17234,7 @@ var Kiwi;
             */
             TextureAtlasRenderer.prototype.clear = function (gl, params) {
                 this._vertexBuffer.clear();
-                gl.uniformMatrix3fv(this.shaderPair.uniforms.uCamMatrix.location, false, params.camMatrix);
+                this.shaderPair.setParam("uCamMatrix", params.camMatrix);
             };
             /**
             * Makes a draw call, this is where things actually get rendered to the draw buffer (or a framebuffer).
@@ -17231,6 +17243,7 @@ var Kiwi;
             * @public
             */
             TextureAtlasRenderer.prototype.draw = function (gl) {
+                this.shaderPair.applyUniforms(gl);
                 this._vertexBuffer.uploadBuffer(gl, this._vertexBuffer.items);
                 gl.enableVertexAttribArray(this.shaderPair.attributes.aXYUV);
                 gl.vertexAttribPointer(this.shaderPair.attributes.aXYUV, 4, gl.FLOAT, false, 20, 0);
@@ -17260,7 +17273,7 @@ var Kiwi;
             * @public
             */
             TextureAtlasRenderer.prototype.updateStageResolution = function (gl, res) {
-                gl.uniform2fv(this.shaderPair.uniforms.uResolution.location, res);
+                this.shaderPair.setParam("uResolution", res);
             };
             /**
             * Updates the texture size uniforms
@@ -17270,7 +17283,7 @@ var Kiwi;
             * @public
             */
             TextureAtlasRenderer.prototype.updateTextureSize = function (gl, size) {
-                gl.uniform2fv(this.shaderPair.uniforms.uTextureSize.location, size);
+                this.shaderPair.setParam("uTextureSize", size);
             };
             /**
             * Sets shader pair by name
@@ -17407,15 +17420,65 @@ var Kiwi;
                 return shader;
             };
             /**
-            * Sets a single uniform value and marks it as dirty.
+            * Sets a single uniform value, marking it as dirty when it has changed.
             * @method setParam
             * @param uniformName {string}
             * @param value {*}
             * @public
             */
             ShaderPair.prototype.setParam = function (uniformName, value) {
-                this.uniforms[uniformName].value = value;
-                this.uniforms[uniformName].dirty = true;
+                var uniform = this.uniforms[uniformName];
+                uniform.value = value;
+                uniform.dirty = !uniform.cacheValid || !this._uniformValueEquals(uniform.cache, value);
+            };
+            /**
+            * Compares uniform values, including array-like values.
+            * @method _uniformValueEquals
+            * @param valueA {*}
+            * @param valueB {*}
+            * @return {boolean}
+            * @private
+            */
+            ShaderPair.prototype._uniformValueEquals = function (valueA, valueB) {
+                if (valueA === valueB) {
+                    return true;
+                }
+                if (!valueA || !valueB || typeof valueA.length !== "number" || typeof valueB.length !== "number" || valueA.length !== valueB.length) {
+                    return false;
+                }
+                for (var i = 0; i < valueA.length; i++) {
+                    if (valueA[i] !== valueB[i]) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+            /**
+            * Copies array-like uniform values so later in-place changes are detected.
+            * @method _copyUniformValue
+            * @param value {*}
+            * @return {*}
+            * @private
+            */
+            ShaderPair.prototype._copyUniformValue = function (value) {
+                if (!value || typeof value.length !== "number") {
+                    return value;
+                }
+                var copy = new Array(value.length);
+                for (var i = 0; i < value.length; i++) {
+                    copy[i] = value[i];
+                }
+                return copy;
+            };
+            /**
+            * Invalidates cached uniform state so the next assigned value is uploaded.
+            * @method invalidateUniforms
+            * @public
+            */
+            ShaderPair.prototype.invalidateUniforms = function () {
+                for (var uniformName in this.uniforms) {
+                    this.uniforms[uniformName].cacheValid = false;
+                }
             };
             /**
             * Applies all uniforms to the uploaded program
@@ -17437,9 +17500,23 @@ var Kiwi;
             */
             ShaderPair.prototype.applyUniform = function (gl, name) {
                 var u = this.uniforms[name];
-                if (this.uniforms[name].dirty) {
-                    gl["uniform" + u.type](u.location, u.value);
-                    this.uniforms[name].dirty = false;
+                if (u.dirty) {
+                    switch (u.type) {
+                        case "mat2":
+                            gl.uniformMatrix2fv(u.location, false, u.value);
+                            break;
+                        case "mat3":
+                            gl.uniformMatrix3fv(u.location, false, u.value);
+                            break;
+                        case "mat4":
+                            gl.uniformMatrix4fv(u.location, false, u.value);
+                            break;
+                        default:
+                            gl["uniform" + u.type](u.location, u.value);
+                    }
+                    u.cache = this._copyUniformValue(u.value);
+                    u.cacheValid = true;
+                    u.dirty = false;
                 }
             };
             /**
@@ -17473,8 +17550,10 @@ var Kiwi;
                 for (var uniformName in this.uniforms) {
                     var uniform = this.uniforms[uniformName];
                     uniform.location = gl.getUniformLocation(this.shaderProgram, uniformName);
-                    uniform.dirty = true;
+                    uniform.dirty = false;
                     uniform.value = null;
+                    uniform.cache = undefined;
+                    uniform.cacheValid = false;
                 }
             };
             /**

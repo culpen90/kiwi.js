@@ -16,7 +16,7 @@
 
 	"main": "kiwi.js",
 	"scripts": {
-		"test": "node test/shader-pair-attributes.cjs"
+		"test": "node test/shader-pair-attributes.cjs && node test/shader-pair-uniforms.cjs"
 	},
 
 	"dependencies": {},
