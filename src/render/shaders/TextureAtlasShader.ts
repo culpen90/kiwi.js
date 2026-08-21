@@ -30,10 +30,6 @@ module Kiwi.Shaders {
 		*/
 		public init(gl: WebGLRenderingContext) {
 			super.init(gl);
-
-			this.attributes.aXYUV = gl.getAttribLocation(this.shaderProgram, "aXYUV");
-			this.attributes.aAlpha = gl.getAttribLocation(this.shaderProgram, "aAlpha");
-			
 			this.initUniforms(gl);
 		}
 

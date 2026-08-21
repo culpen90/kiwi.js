@@ -38,6 +38,7 @@ module Kiwi.Shaders {
 			this.vertShader = this.compile(gl, this.vertSource.join("\n"), gl.VERTEX_SHADER);
 			this.fragShader = this.compile(gl, this.fragSource.join("\n"), gl.FRAGMENT_SHADER);
 			this.shaderProgram = this.attach(gl, this.vertShader, this.fragShader);
+			this.initAttributes(gl);
 			this.loaded = true;
 		}
 
@@ -119,9 +120,9 @@ module Kiwi.Shaders {
 		public uniforms: any;
 
 		/**
-		* Attribute descriptors
+		* Attribute locations, keyed by name.
 		* @property attributes
-		* @type Array
+		* @type Object
 		* @public
 		*/
 		public attributes: any;
@@ -179,6 +180,32 @@ module Kiwi.Shaders {
 			if (this.uniforms[name].dirty) {
 				gl["uniform" + u.type](u.location, u.value);
 				this.uniforms[name].dirty = false;
+			}
+		}
+
+		/**
+		* Detects the attributes exposed by the linked shader program.
+		* @method initAttributes
+		* @param gl {WebGLRenderingContext}
+		* @public
+		*/
+		public initAttributes(gl: WebGLRenderingContext) {
+			if (!this.attributes) {
+				this.attributes = {};
+			}
+
+			for (var attributeName in this.attributes) {
+				this.attributes[attributeName] = gl.getAttribLocation(this.shaderProgram, attributeName);
+			}
+
+			var attributeCount = gl.getProgramParameter(this.shaderProgram, gl.ACTIVE_ATTRIBUTES);
+
+			for (var i = 0; i < attributeCount; i++) {
+				var attribute = gl.getActiveAttrib(this.shaderProgram, i);
+
+				if (attribute && !Object.prototype.hasOwnProperty.call(this.attributes, attribute.name)) {
+					this.attributes[attribute.name] = gl.getAttribLocation(this.shaderProgram, attribute.name);
+				}
 			}
 		}
 
